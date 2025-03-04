@@ -1,59 +1,35 @@
 import { Metadata } from 'next'
+import { client } from '@/lib/sanity'
+import { urlFor } from '@/lib/sanity'
+import Image from 'next/image'
 
 export const metadata: Metadata = {
   title: 'Menu - Odyssey By Sely',
   description: 'Explore our carefully curated menu featuring modern interpretations of classic dishes.',
 }
 
-const menuSections = [
-  {
-    title: 'Starters',
-    items: [
-      {
-        name: 'Mediterranean Mezze Platter',
-        description: 'Hummus, babaganoush, tzatziki, olives, and warm pita bread',
-        price: '$16',
-      },
-      {
-        name: 'Seared Scallops',
-        description: 'Pan-seared scallops with cauliflower purée and crispy pancetta',
-        price: '$19',
-      },
-    ],
-  },
-  {
-    title: 'Main Courses',
-    items: [
-      {
-        name: 'Grilled Lamb Chops',
-        description: 'Herb-crusted lamb chops with roasted vegetables and mint sauce',
-        price: '$38',
-      },
-      {
-        name: 'Pan-Seared Salmon',
-        description: 'Fresh Atlantic salmon with quinoa risotto and asparagus',
-        price: '$32',
-      },
-    ],
-  },
-  {
-    title: 'Desserts',
-    items: [
-      {
-        name: 'Dark Chocolate Soufflé',
-        description: 'Warm chocolate soufflé with vanilla bean ice cream',
-        price: '$14',
-      },
-      {
-        name: 'Crème Brûlée',
-        description: 'Classic vanilla bean crème brûlée with fresh berries',
-        price: '$12',
-      },
-    ],
-  },
-]
+async function getMenuData() {
+  const categories = await client.fetch(`
+    *[_type == "category"] | order(order asc) {
+      _id,
+      name,
+      description,
+      "items": *[_type == "menuItem" && references(^._id)] | order(name asc) {
+        _id,
+        name,
+        description,
+        price,
+        image,
+        dietary
+      }
+    }
+  `)
+  return categories
+}
 
-export default function MenuPage() {
+export default async function MenuPage() {
+  const menuSections = await getMenuData()
+
   return (
     <div className="min-h-screen bg-black pt-20">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
@@ -67,24 +43,49 @@ export default function MenuPage() {
         </div>
 
         <div className="mt-16 space-y-16">
-          {menuSections.map((section) => (
-            <div key={section.title} className="border-t border-gray-800 pt-10">
+          {menuSections.map((section: any) => (
+            <div key={section._id} className="border-t border-gray-800 pt-10">
               <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                {section.title}
+                {section.name}
               </h2>
+              {section.description && (
+                <p className="mt-2 text-gray-300">{section.description}</p>
+              )}
               <div className="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-                {section.items.map((item) => (
+                {section.items.map((item: any) => (
                   <div
-                    key={item.name}
-                    className="rounded-lg bg-gray-900 p-6 transition hover:bg-gray-800"
+                    key={item._id}
+                    className="group relative rounded-lg bg-gray-900 p-6 transition hover:bg-gray-800"
                   >
+                    {item.image && (
+                      <div className="relative mb-4 h-48 w-full overflow-hidden rounded-lg">
+                        <Image
+                          src={urlFor(item.image).url()}
+                          alt={item.name}
+                          fill
+                          className="object-cover transition-transform duration-200 group-hover:scale-105"
+                        />
+                      </div>
+                    )}
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-medium text-white">{item.name}</h3>
                       <span className="text-lg font-semibold text-white">
-                        {item.price}
+                        ${item.price}
                       </span>
                     </div>
                     <p className="mt-2 text-sm text-gray-300">{item.description}</p>
+                    {item.dietary && item.dietary.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {item.dietary.map((diet: string) => (
+                          <span
+                            key={diet}
+                            className="inline-flex items-center rounded-full bg-gray-800 px-2.5 py-0.5 text-xs font-medium text-gray-300"
+                          >
+                            {diet}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
